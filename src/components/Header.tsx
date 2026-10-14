@@ -5,12 +5,15 @@ import {
   Undo2,
   Redo2,
   Film,
-  BarChart2
+  BarChart2,
+  Camera
 } from 'lucide-react'
 import { AnalyticsModal } from './AnalyticsModal'
+import { FrameExtractorModal } from './FrameExtractorModal'
 
 export const Header: React.FC = () => {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false)
+  const [isFrameExtractorOpen, setIsFrameExtractorOpen] = useState(false)
 
   return (
     <>
@@ -47,8 +50,17 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Export & Settings */}
+        {/* Right: Actions */}
         <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setIsFrameExtractorOpen(true)}
+            className="flex items-center space-x-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded text-xs font-medium border border-zinc-700 transition-colors"
+            title="Capture First 4s Screenshots"
+          >
+            <Camera className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Frame Screenshots</span>
+          </button>
+
           <button
             onClick={() => setIsAnalyticsOpen(true)}
             className="flex items-center space-x-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded text-xs font-medium border border-zinc-700 transition-colors"
@@ -57,6 +69,7 @@ export const Header: React.FC = () => {
             <BarChart2 className="w-3.5 h-3.5 text-red-500" />
             <span>Analytics Export</span>
           </button>
+
           <button className="p-1.5 rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors" title="Settings">
             <Settings className="w-4 h-4" />
           </button>
@@ -71,6 +84,12 @@ export const Header: React.FC = () => {
       <AnalyticsModal
         isOpen={isAnalyticsOpen}
         onClose={() => setIsAnalyticsOpen(false)}
+      />
+
+      {/* Frame Extractor Modal Dialog */}
+      <FrameExtractorModal
+        isOpen={isFrameExtractorOpen}
+        onClose={() => setIsFrameExtractorOpen(false)}
       />
     </>
   )
