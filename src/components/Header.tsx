@@ -6,14 +6,17 @@ import {
   Redo2,
   Film,
   BarChart2,
-  Camera
+  Camera,
+  Sparkles
 } from 'lucide-react'
 import { AnalyticsModal } from './AnalyticsModal'
 import { FrameExtractorModal } from './FrameExtractorModal'
+import { HookFinderModal } from './HookFinderModal'
 
 export const Header: React.FC = () => {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false)
   const [isFrameExtractorOpen, setIsFrameExtractorOpen] = useState(false)
+  const [isHookFinderOpen, setIsHookFinderOpen] = useState(false)
 
   return (
     <>
@@ -53,6 +56,15 @@ export const Header: React.FC = () => {
         {/* Right: Actions */}
         <div className="flex items-center space-x-3">
           <button
+            onClick={() => setIsHookFinderOpen(true)}
+            className="flex items-center space-x-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors shadow-sm"
+            title="AI Hook Finder Workflow"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+            <span>Find Hooks</span>
+          </button>
+
+          <button
             onClick={() => setIsFrameExtractorOpen(true)}
             className="flex items-center space-x-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded text-xs font-medium border border-zinc-700 transition-colors"
             title="Capture First 4s Screenshots"
@@ -90,6 +102,12 @@ export const Header: React.FC = () => {
       <FrameExtractorModal
         isOpen={isFrameExtractorOpen}
         onClose={() => setIsFrameExtractorOpen(false)}
+      />
+
+      {/* AI Hook Finder Modal Dialog */}
+      <HookFinderModal
+        isOpen={isHookFinderOpen}
+        onClose={() => setIsHookFinderOpen(false)}
       />
     </>
   )
