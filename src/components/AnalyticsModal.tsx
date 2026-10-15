@@ -47,19 +47,23 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
     setError(null);
     try {
       const activeToken = token ?? accessToken ?? 'demo_token';
-      let url = `/.netlify/functions/youtube-analytics?format=json`;
+      let query = `format=json`;
       if (shortsOnly) {
-        url += `&shortsOnly=true&limit=10`;
+        query += `&shortsOnly=true&limit=10`;
       }
       if (singleVideoId) {
-        url += `&videoId=${encodeURIComponent(singleVideoId)}`;
+        query += `&videoId=${encodeURIComponent(singleVideoId)}`;
       }
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${activeToken}`,
-        },
+      let response = await fetch(`/api/youtube-analytics?${query}`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
       });
+
+      if (!response.ok) {
+        response = await fetch(`/.netlify/functions/youtube-analytics?${query}`, {
+          headers: { Authorization: `Bearer ${activeToken}` },
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to fetch analytics: ${response.statusText}`);
@@ -110,14 +114,18 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
     setDownloading(true);
     try {
       const activeToken = accessToken || 'demo_token';
-      let url = `/.netlify/functions/youtube-analytics?format=csv`;
-      if (filterMode === 'shorts') url += `&shortsOnly=true&limit=10`;
+      let query = `format=csv`;
+      if (filterMode === 'shorts') query += `&shortsOnly=true&limit=10`;
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${activeToken}`,
-        },
+      let response = await fetch(`/api/youtube-analytics?${query}`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
       });
+
+      if (!response.ok) {
+        response = await fetch(`/.netlify/functions/youtube-analytics?${query}`, {
+          headers: { Authorization: `Bearer ${activeToken}` },
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to generate CSV: ${response.statusText}`);

@@ -16,11 +16,19 @@ export interface SuggestHooksResponse {
  */
 export async function processVttContent(vttContent: string): Promise<ProcessVttResponse> {
   try {
-    const response = await fetch('/.netlify/functions/find-hooks', {
+    let response = await fetch('/api/find-hooks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'process_vtt', vttContent })
     });
+
+    if (!response.ok) {
+      response = await fetch('/.netlify/functions/find-hooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'process_vtt', vttContent })
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to process VTT: ${response.statusText}`);
@@ -59,11 +67,19 @@ export async function processVttContent(vttContent: string): Promise<ProcessVttR
  */
 export async function analyzeTop10Hooks(topHooks: Top10HookInput[]): Promise<HookAnalysis> {
   try {
-    const response = await fetch('/.netlify/functions/find-hooks', {
+    let response = await fetch('/api/find-hooks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'analyze_hooks', topHooks })
     });
+
+    if (!response.ok) {
+      response = await fetch('/.netlify/functions/find-hooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyze_hooks', topHooks })
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to analyze hooks: ${response.statusText}`);
@@ -103,11 +119,19 @@ export async function generateHookSuggestions(
   hookAnalysis: HookAnalysis
 ): Promise<HookSuggestion[]> {
   try {
-    const response = await fetch('/.netlify/functions/find-hooks', {
+    let response = await fetch('/api/find-hooks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'suggest_hooks', segment, hookAnalysis })
     });
+
+    if (!response.ok) {
+      response = await fetch('/.netlify/functions/find-hooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'suggest_hooks', segment, hookAnalysis })
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to suggest hooks: ${response.statusText}`);

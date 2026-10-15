@@ -42,24 +42,26 @@ In the API Library (`APIs & Services` -> `Library`), search for and enable the f
 2. Click **Create Credentials** -> **OAuth client ID**.
 3. Select Application type: **Web application**.
 4. Set Authorized JavaScript origins:
-   - `http://localhost:5173` (for local development)
-   - `https://your-domain.netlify.app` (for production)
+   - `http://localhost:5173` (for local dev server)
+   - `http://localhost:3000` (for standalone server)
 5. Set Authorized redirect URIs:
    - `http://localhost:5173/auth/callback`
-   - `https://your-domain.netlify.app/auth/callback`
+   - `http://localhost:3000/auth/callback`
 6. Save your **Client ID** and **Client Secret**.
 
 ---
 
-## 3. Environment Variables
+## 3. Environment Variables (Standalone / Local)
 
-Store these secrets securely in your environment variables (e.g., in `.env` or Netlify Site Configuration):
+Store these credentials in your local `.env` file (see [README.md](./README.md) for full setup instructions):
 
 ```env
 YOUTUBE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
 YOUTUBE_CLIENT_SECRET=your_google_client_secret
 YOUTUBE_REDIRECT_URI=http://localhost:5173/auth/callback
 ```
+
+*Note: If OAuth variables are omitted, StudioCut runs seamlessly with realistic demo datasets out-of-the-box.*
 
 ---
 
@@ -72,21 +74,17 @@ YOUTUBE_REDIRECT_URI=http://localhost:5173/auth/callback
 
 ---
 
-## 5. API Endpoint Examples
+## 5. API Endpoint Examples (No Netlify Dependency)
 
-### Fetch Latest Uploads Playlist ID
-```bash
-curl -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  "https://www.googleapis.com/youtube/v3/channels?mine=true&part=contentDetails"
-```
+StudioCut serves API endpoints under `/api/` (with fallback support for `/.netlify/functions/`):
 
 ### Fetch Video Analytics via StudioCut Function Endpoint
 ```bash
 # Get JSON formatted metrics with 0-4s transcript hooks
 curl -H "Authorization: Bearer demo_token" \
-  "http://localhost:5173/.netlify/functions/youtube-analytics?format=json&shortsOnly=true&limit=10"
+  "http://localhost:5173/api/youtube-analytics?format=json&shortsOnly=true&limit=10"
 
 # Download CSV Export
 curl -H "Authorization: Bearer demo_token" \
-  "http://localhost:5173/.netlify/functions/youtube-analytics?format=csv" -o analytics.csv
+  "http://localhost:5173/api/youtube-analytics?format=csv" -o analytics.csv
 ```
