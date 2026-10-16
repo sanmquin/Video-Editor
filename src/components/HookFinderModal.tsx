@@ -24,7 +24,6 @@ import {
   type HookAnalysis,
   type HookSuggestion
 } from '../utils/geminiHooks';
-import { handler as analyticsHandler } from '../../netlify/functions/youtube-analytics';
 
 interface HookFinderModalProps {
   isOpen: boolean;
@@ -72,16 +71,17 @@ export const HookFinderModal: React.FC<HookFinderModalProps> = ({ isOpen, onClos
   const loadTop10HooksAndAnalyze = async () => {
     setIsAnalyzingHooks(true);
     try {
-      // Fetch YouTube analytics dataset via Netlify handler call or mock
-      const mockEvent: any = {
-        httpMethod: 'GET',
-        headers: {},
-        queryStringParameters: { shortsOnly: 'true', limit: '10' }
-      };
-      const res = await analyticsHandler(mockEvent, {} as any);
+      // Fetch YouTube analytics dataset via API endpoint
+      const res = await fetch('/api/youtube-analytics?format=json&shortsOnly=true&limit=10');
       let topData = [];
-      if (res && res.body) {
-        topData = JSON.parse(res.body);
+      if (res.ok) {
+        topData = await res.json();
+      } else {
+        // Fallback endpoint if /api path is not configured
+        const fallbackRes = await fetch('/.netlify/functions/youtube-analytics?format=json&shortsOnly=true&limit=10');
+        if (fallbackRes.ok) {
+          topData = await fallbackRes.json();
+        }
       }
 
       const formattedTopHooks = topData.map((item: any) => ({

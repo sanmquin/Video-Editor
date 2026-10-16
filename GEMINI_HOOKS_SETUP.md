@@ -36,15 +36,17 @@ The AI Hook Finder helps video creators turn raw `.vtt` subtitles into high-rete
 
 ---
 
-## Setup & Configuration
+## Setup & Configuration (Standalone / Local)
 
 ### Environment Variables
 
-Set the `GEMINI_API_KEY` in your environment or `.env` file (for Netlify functions / Vite server):
+Set the `GEMINI_API_KEY` in your `.env` file (see [README.md](./README.md) for step-by-step setup):
 
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
+*Note: If `GEMINI_API_KEY` is not provided, StudioCut automatically uses a built-in intelligent rule-based algorithm.*
 
 ### Model Specifications
 
@@ -54,10 +56,12 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ---
 
-## API Endpoints & Middleware
+## API Endpoints & Middleware (No Netlify Dependency)
 
-Netlify function handler: `/netlify/functions/find-hooks.ts`
-Vite Dev Middleware: `vite.config.ts` handles `/.netlify/functions/find-hooks`.
+- **Primary API Endpoint**: `/api/find-hooks`
+- **Backward Compatibility Route**: `/.netlify/functions/find-hooks`
+- **Function Code**: `netlify/functions/find-hooks.ts`
+- **Middleware**: Integrated into Vite Dev/Preview server (`vite.config.ts`) and Standalone Server (`server.mjs`).
 
 ### Actions Handled:
 - `process_vtt`: Accepts `{ vttContent }`, returns cleaned transcript + 10 segments.
@@ -68,7 +72,7 @@ Vite Dev Middleware: `vite.config.ts` handles `/.netlify/functions/find-hooks`.
 
 ## Testing & Verification
 
-1. Start development server: `npm run dev`
+1. Start local server: `npm run dev` (or `npm run build && npm start`)
 2. Click **Find Hooks** in the top navigation header.
 3. Click **"Or load sample demo VTT file"** or upload a `.vtt` file.
 4. Select a segment, view AI suggested hooks with contiguous word cuts, and process a local video file with 5-second margins.

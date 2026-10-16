@@ -13,23 +13,31 @@ import {
   Filter,
   Flame,
   Search,
-  Code
+  Code,
+  Key
 } from 'lucide-react';
 import type { VideoAnalytics } from '../../netlify/functions/youtube-analytics';
 import { parseVttContent } from '../utils/vttParser';
+import {
+  initiateGoogleOAuthLogin,
+  clearStoredToken,
+  getTokenAuthInfo,
+  getStoredToken,
+  fetchYouTubeUserProfile,
+  type YouTubeUserProfile
+} from '../utils/googleAuth';
 
 interface AnalyticsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenDocs?: (tab?: 'oauth' | 'troubleshooting') => void;
 }
 
-export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose }) => {
-  const [accessToken, setAccessToken] = useState<string>(() => {
-    return localStorage.getItem('yt_access_token') || '';
-  });
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return Boolean(localStorage.getItem('yt_access_token'));
-  });
+export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
+  isOpen,
+  onClose,
+  onOpenDocs
+}) => {
   const [data, setData] = useState<VideoAnalytics[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
@@ -40,26 +48,36 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
 
+  // User Profile
+  const [userProfile, setUserProfile] = useState<YouTubeUserProfile | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchAnalytics = useCallback(async (token?: string, shortsOnly = false, singleVideoId?: string) => {
+  const authInfo = getTokenAuthInfo();
+  const isAuthenticated = authInfo.isValid && Boolean(authInfo.token);
+
+  const fetchAnalytics = useCallback(async (tokenOverride?: string, shortsOnly = false, singleVideoId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const activeToken = token ?? accessToken ?? 'demo_token';
-      let url = `/.netlify/functions/youtube-analytics?format=json`;
+      const activeToken = tokenOverride || getStoredToken() || 'demo_token';
+      let query = `format=json`;
       if (shortsOnly) {
-        url += `&shortsOnly=true&limit=10`;
+        query += `&shortsOnly=true&limit=10`;
       }
       if (singleVideoId) {
-        url += `&videoId=${encodeURIComponent(singleVideoId)}`;
+        query += `&videoId=${encodeURIComponent(singleVideoId)}`;
       }
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${activeToken}`,
-        },
+      let response = await fetch(`/api/youtube-analytics?${query}`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
       });
+
+      if (!response.ok) {
+        response = await fetch(`/.netlify/functions/youtube-analytics?${query}`, {
+          headers: { Authorization: `Bearer ${activeToken}` },
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to fetch analytics: ${response.statusText}`);
@@ -75,49 +93,46 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
     } finally {
       setLoading(false);
     }
-  }, [accessToken, selectedVideoId]);
+  }, [selectedVideoId]);
 
   useEffect(() => {
     if (isOpen) {
+      const activeToken = getStoredToken();
+      if (activeToken) {
+        fetchYouTubeUserProfile(activeToken).then(profile => {
+          if (profile) setUserProfile(profile);
+        });
+      }
       fetchAnalytics(undefined, filterMode === 'shorts');
     }
-  }, [isOpen]);
+  }, [isOpen, filterMode, fetchAnalytics]);
 
-  const handleModalOpen = () => {
-    fetchAnalytics(undefined, filterMode === 'shorts');
-  };
-
-  const handleAuthenticate = () => {
-    const tokenInput = prompt(
-      "Enter your YouTube OAuth Access Token (or leave blank for Demo Account):"
-    );
-
-    const token = tokenInput?.trim() || "demo_token_" + Date.now();
-    localStorage.setItem('yt_access_token', token);
-    setAccessToken(token);
-    setIsAuthenticated(true);
-    fetchAnalytics(token, filterMode === 'shorts');
+  const handleAuthenticateWithGoogle = () => {
+    initiateGoogleOAuthLogin();
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('yt_access_token');
-    setAccessToken('');
-    setIsAuthenticated(false);
+    clearStoredToken();
+    setUserProfile(null);
     fetchAnalytics('demo_token', filterMode === 'shorts');
   };
 
   const handleExportCsv = async () => {
     setDownloading(true);
     try {
-      const activeToken = accessToken || 'demo_token';
-      let url = `/.netlify/functions/youtube-analytics?format=csv`;
-      if (filterMode === 'shorts') url += `&shortsOnly=true&limit=10`;
+      const activeToken = getStoredToken() || 'demo_token';
+      let query = `format=csv`;
+      if (filterMode === 'shorts') query += `&shortsOnly=true&limit=10`;
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${activeToken}`,
-        },
+      let response = await fetch(`/api/youtube-analytics?${query}`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
       });
+
+      if (!response.ok) {
+        response = await fetch(`/.netlify/functions/youtube-analytics?${query}`, {
+          headers: { Authorization: `Bearer ${activeToken}` },
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to generate CSV: ${response.statusText}`);
@@ -206,7 +221,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
             </div>
             <div>
               <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
-                YouTube Analytics & Hook Transcript Features
+                YouTube Analytics & Hook Transcripts
                 <span className="text-xs font-normal text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
                   Swipe, Retention & Engagement
                 </span>
@@ -221,27 +236,37 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
             {isAuthenticated ? (
               <div className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-medium">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>YouTube Authenticated</span>
+                <span>{userProfile?.channelTitle || 'Google Authenticated'} ({authInfo.remainingMinutes}m)</span>
                 <button
                   onClick={handleLogout}
                   className="ml-2 text-zinc-400 hover:text-zinc-200 p-0.5 hover:bg-zinc-800 rounded"
-                  title="Disconnect YouTube"
+                  title="Disconnect Google Account"
                 >
                   <LogOut className="w-3 h-3" />
                 </button>
               </div>
             ) : (
               <button
-                onClick={handleAuthenticate}
-                className="flex items-center space-x-1.5 bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                onClick={handleAuthenticateWithGoogle}
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>Authenticate YouTube</span>
+                <span>Sign in with Google</span>
+              </button>
+            )}
+
+            {onOpenDocs && (
+              <button
+                onClick={() => onOpenDocs('oauth')}
+                className="p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors"
+                title="Google OAuth Setup Guide"
+              >
+                <Key className="w-4 h-4" />
               </button>
             )}
 
             <button
-              onClick={() => handleModalOpen()}
+              onClick={() => fetchAnalytics(undefined, filterMode === 'shorts')}
               disabled={loading}
               className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
               title="Refresh Analytics Data"
@@ -284,7 +309,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
                   : 'bg-zinc-800/60 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
               }`}
             >
-              All Videos (25)
+              All Videos ({data.length || 25})
             </button>
             <button
               onClick={() => {
