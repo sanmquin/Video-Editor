@@ -27,11 +27,99 @@ export function parseVttTimestamp(timestampStr: string): number {
 }
 
 /**
- * Parses WebVTT content string into structured transcript data
+ * Normalizes a word string for comparison (lowercase, alphanumeric characters only)
+ */
+function normalizeWord(word: string): string {
+  return word.replace(/[^\w]/g, '').toLowerCase();
+}
+
+/**
+ * Strips HTML tags and inline timestamps (e.g. <00:00:01.200>, <v Host>, <b>)
+ */
+function cleanCueText(rawText: string): string {
+  return rawText.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Deduplicates YouTube rolling auto-captions across cues using word-level suffix-prefix overlap matching.
+ */
+export function deduplicateCueTexts(cueTexts: string[]): { cleanedSegments: string[]; fullTranscript: string } {
+  const cumulativeWords: string[] = [];
+  const cleanedSegments: string[] = [];
+
+  for (const rawText of cueTexts) {
+    const text = cleanCueText(rawText);
+    if (!text) {
+      cleanedSegments.push('');
+      continue;
+    }
+
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      cleanedSegments.push('');
+      continue;
+    }
+
+    let maxOverlap = 0;
+    const maxLookback = Math.min(cumulativeWords.length, 50);
+
+    // 1. Suffix-prefix overlap search
+    for (let k = 1; k <= words.length; k++) {
+      const prefix = words.slice(0, k).map(normalizeWord);
+      for (let start = cumulativeWords.length - maxLookback; start <= cumulativeWords.length - k; start++) {
+        if (start < 0) continue;
+        const suffix = cumulativeWords.slice(start, start + k).map(normalizeWord);
+        let match = true;
+        for (let i = 0; i < k; i++) {
+          if (prefix[i] !== suffix[i]) {
+            match = false;
+            break;
+          }
+        }
+        if (match && start + k === cumulativeWords.length) {
+          if (k > maxOverlap) {
+            maxOverlap = k;
+          }
+        }
+      }
+    }
+
+    // 2. Sub-phrase match if cue is completely repeated line inside recent cumulative words
+    if (maxOverlap === 0 && cumulativeWords.length > 0) {
+      const normWords = words.map(normalizeWord);
+      const normCum = cumulativeWords.slice(-maxLookback).map(normalizeWord);
+      for (let i = 0; i <= normCum.length - normWords.length; i++) {
+        let subMatch = true;
+        for (let j = 0; j < normWords.length; j++) {
+          if (normCum[i + j] !== normWords[j]) {
+            subMatch = false;
+            break;
+          }
+        }
+        if (subMatch) {
+          maxOverlap = words.length;
+          break;
+        }
+      }
+    }
+
+    const newWords = words.slice(maxOverlap);
+    cumulativeWords.push(...newWords);
+    cleanedSegments.push(newWords.join(' '));
+  }
+
+  return {
+    cleanedSegments,
+    fullTranscript: cumulativeWords.join(' ')
+  };
+}
+
+/**
+ * Parses WebVTT content string into structured transcript data with YouTube rolling auto-caption deduplication.
  */
 export function parseVttContent(vttText: string): ParsedVttResult {
   const lines = vttText.split(/\r?\n/);
-  const segments: TranscriptSegment[] = [];
+  const rawCues: { start: number; end: number; textLines: string[] }[] = [];
 
   let currentStart = -1;
   let currentEnd = -1;
@@ -40,23 +128,17 @@ export function parseVttContent(vttText: string): ParsedVttResult {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
 
-    // Skip WEBVTT header, NOTE comments, or empty lines before timestamps
     if (line.startsWith('WEBVTT') || line.startsWith('NOTE') || line.startsWith('STYLE')) {
       continue;
     }
 
-    // Check for timestamp line e.g. "00:00:01.200 --> 00:00:03.500"
     if (line.includes('-->')) {
-      // If we have previous segment, push it
       if (currentStart >= 0 && currentTextLines.length > 0) {
-        const text = currentTextLines.join(' ').replace(/<[^>]*>/g, '').trim();
-        if (text) {
-          segments.push({
-            start: Number(currentStart.toFixed(2)),
-            duration: Number((Math.max(0, currentEnd - currentStart)).toFixed(2)),
-            text
-          });
-        }
+        rawCues.push({
+          start: currentStart,
+          end: currentEnd,
+          textLines: [...currentTextLines]
+        });
         currentTextLines = [];
       }
 
@@ -64,29 +146,38 @@ export function parseVttContent(vttText: string): ParsedVttResult {
       currentStart = parseVttTimestamp(startStr);
       currentEnd = parseVttTimestamp(endStr);
     } else if (currentStart >= 0 && line.length > 0 && !/^\d+$/.test(line)) {
-      // Content line (ignore line numbers)
       currentTextLines.push(line);
     }
   }
 
-  // Push last segment
   if (currentStart >= 0 && currentTextLines.length > 0) {
-    const text = currentTextLines.join(' ').replace(/<[^>]*>/g, '').trim();
+    rawCues.push({
+      start: currentStart,
+      end: currentEnd,
+      textLines: [...currentTextLines]
+    });
+  }
+
+  const rawCueTexts = rawCues.map(c => c.textLines.join(' '));
+  const { cleanedSegments, fullTranscript } = deduplicateCueTexts(rawCueTexts);
+
+  const segments: TranscriptSegment[] = [];
+  for (let i = 0; i < rawCues.length; i++) {
+    const text = cleanedSegments[i];
     if (text) {
       segments.push({
-        start: Number(currentStart.toFixed(2)),
-        duration: Number((Math.max(0, currentEnd - currentStart)).toFixed(2)),
+        start: Number(rawCues[i].start.toFixed(2)),
+        duration: Number((Math.max(0, rawCues[i].end - rawCues[i].start)).toFixed(2)),
         text
       });
     }
   }
 
-  const cleanTranscript = segments.map(s => s.text).join(' ');
   const first4sSegments = segments.filter(s => s.start < 4.0);
   const first4sTranscriptJson = JSON.stringify(first4sSegments);
 
   return {
-    cleanTranscript,
+    cleanTranscript: fullTranscript,
     first4sSegments,
     first4sTranscriptJson,
     allSegments: segments
