@@ -1,0 +1,19 @@
+WEBVTT
+
+NOTE
+This is a sample WebVTT subtitle file for testing the Notebook VTT parser.
+
+00:00:00.000 --> 00:00:02.500
+<v Host>Welcome to the StudioCut clip-cli tutorial!</v>
+
+00:00:02.500 --> 00:00:05.000
+<v Host>Welcome to the StudioCut clip-cli tutorial!</v>
+
+00:00:05.000 --> 00:00:08.200
+In this video, <b>we will clean VTT files</b> using Python.
+
+00:00:08.200 --> 00:00:12.000
+Using Python and Google Colab, you can automate transcript parsing.
+
+00:00:12.000 --> 00:00:15.500
+um so basically like we are going to store outputs in Google Drive.
